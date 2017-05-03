@@ -32,7 +32,7 @@ hash_nodo_t* hash_nodo_crear(char* clave, void* dato){
   return nodo;
 }
 void hash_nodo_destruir(hash_nodo_t* nodo, hash_destruir_dato_t destruir_dato){
-  destruir_dato(nodo->dato);
+  if(destruir_dato) destruir_dato(nodo->dato);
   free(nodo->clave);
   free(nodo);
 }
@@ -119,7 +119,17 @@ bool hash_guardar(hash_t *hash, const char *clave, void *dato){ //FALTA REDIMENS
     return true;
 }
 void *hash_borrar(hash_t *hash, const char *clave){
-
+	lista_iter_t* iterEnNodoEncontrado = hash_buscar_clave(hash, clave);
+  if(iterEnNodoEncontrado){
+    hash_nodo_t* nodo = lista_iter_borrar(iterEnNodoEncontrado);
+		void* dato = nodo->dato;
+		
+    hash_nodo_destruir(nodo, NULL);			//tiene que borrar el dato?
+		lista_iter_destruir(iterEnNodoEncontrado);
+		
+    return dato;
+  }
+  return NULL;
 }
 void* hash_obtener(const hash_t *hash, const char *clave){
   lista_iter_t* iterEnNodoEncontrado = hash_buscar_clave(hash, clave);
