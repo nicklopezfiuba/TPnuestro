@@ -3,36 +3,105 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define CAPAC 1000  //Capacidad
+//#define CAPAC 1000  // deberia ser numero primo para que el hash distribuya mejor segun martin.
+#define CAPACIDAD 53  // Me parece mejor que empiece de menor tamaÃ±o e ir redimensionando si se necesita mas,
+                      // sino tenia que guardar 3000 datos antes de redimensionar
 
-// Para guardar la clave y dato en cada Nodo, creo que podemos diseniar un struct mas (Nodo_hash)
-// Segun tengo graficado en la carpeta hay que guardar ambos, esta es una duda a preguntar
-// maniana.
-//     void* dato;
-//     char* key;
+                      //Las documentaciones de las funciones ya estan en el .h
 
-typedef struct hash_interno{
-    lista_t* lista;
-}hash_interno_t;
+//ESTRUCTURAS DE DATOS
 
+typedef struct nodo{
+  void* dato;
+  char* clave;
+}hash_nodo_t;
 
 struct hash{
-    hash_interno_t* datos;                       
+    void* tabla;
     hash_destruir_dato_t* funcion_destruir;
-    size_t elementos;                            // Elementos del Hash
+    size_t elementos;
+    size_t capacidad;
 };
 
+//PRIMITIVAS nodo
 
-/* Crea el hash
- */
+hash_nodo_t* hash_nodo_crear(char* clave, void* dato){
+  hash_nodo_t* nodo = malloc(sizeof(hash_nodo_t));
+  if(!nodo) return NULL;
+
+  nodo->clave = strdup(clave);      //para que el usuario no pueda modificar el contenido de su puntero y romper el hash
+  nodo->dato = dato;
+
+  return nodo;
+}
+void hash_nodo_destruir(hash_nodo_t* nodo, hash_destruir_dato_t destruir_dato){
+  destruir_dato(nodo->dato);
+  free(nodo->clave);
+  free(nodo);
+}
+void hash_nodo_reemplazar_dato(hash_nodo_t* nodo, void* dato, hash_destruir_dato_t destruir_dato){
+  destruir_dato(nodo->dato);
+  nodo->dato = dato;
+}
+
+//FUNCION HASHING
+
+int hash_func(char* clave, int capacidad){
+    char* claveIter = clave;
+    int suma = 0;                       //suma de los valores numericos de los caracteres de la clave
+    while(*claveIter != '\0'){
+      suma += (int)*claveIter;
+      claveIter++;                      //avanza puntero
+    }
+    return suma % capacidad;
+}
+
+//FUNCIONES AUXILIARES
+
+
+
+//Busca una clave dentro de una lista y devuelve un iterador posicionado en el nodo que posee esa clave,
+//o devuelve NULL si no se encontro la clave.
+lista_iter_t* lista_buscar_clave(lista_t* lista, char* clave){
+  lista_iter_t* listaIter = lista_iter_crear(lista);
+
+  hash_nodo_t* nodoActual = lista_iter_ver_actual(listaIter);
+  while(!lista_iter_al_final(listaIter) && strcmp(nodoActual->clave, clave)){
+    lista_iter_avanzar(listaIter);
+    nodoActual = lista_iter_ver_actual(listaIter);
+  }
+  if(lista_iter_al_final(listaIter)){
+    lista_iter_destruir(listaIter);
+    return NULL;
+  }
+  return listaIter;
+}
+lista_iter_t* hash_buscar_clave(hash_t* hash, char* clave){
+  int pos = hash_func(clave, hash->capacidad);
+  return lista_buscar_clave(hash->tabla[pos], clave);
+}
+
+//PRIMITIVAS HASH
+
 hash_t* hash_crear(hash_destruir_dato_t destruir_dato){
     hash_t* hash = malloc(sizeof(hash_t));
     if(!hash) return NULL;
 
-    hash->datos = malloc(sizeof(hash_interno_t) * CAPAC);
-    if(!hash->datos){
+    hash->tabla = malloc(sizeof(lista_t) * CAPACIDAD);  //En casa agrego a la carpeta la implementacion de la lista
+    if(!hash->tabla){
         free(hash);
         return NULL;
+    }
+    for (size_t i = 0; i < CAPACIDAD; i++) {
+      tabla[i] = lista_crear();
+      if(!tabla[i]){
+        for (size_t j = 0; j < i; j++) {
+          lista_destruir(tabla[j]);
+        }
+        free(hash->tabla);
+        free(hash);
+        return NULL;    //que te parece esta parte? me parece que me complique de mas
+      }
     }
 
     hash->elementos = 0;
@@ -40,63 +109,41 @@ hash_t* hash_crear(hash_destruir_dato_t destruir_dato){
     return hash;
 }
 
-
-
-/* Guarda un elemento en el hash, si la clave ya se encuentra en la
- * estructura, la reemplaza. De no poder guardarlo devuelve false.
- * Pre: La estructura hash fue inicializada
- * Post: Se almacenó el par (clave, dato)
- */
-bool hash_guardar(hash_t *hash, const char *clave, void *dato){
+bool hash_guardar(hash_t *hash, const char *clave, void *dato){ //FALTA REDIMENSIONADO
+    lista_iter_t* iterEnNodoEncontrado = hash_buscar_clave(hash, clave);  //si se te ocurre otro nombre descriptivo no tan largo metelo
+    if(iterEnNodoEncontrado){
+      hash_nodo_reemplazar_dato(lista_iter_ver_actual(iterEnNodoEncontrado), dato, hash->destruir_dato);
+      lista_iter_destruir(iterEnNodoEncontrado);
+    }else{
+      hash_nodo_t* nodo = hash_nodo_crear(clave, dato);
+      if(!nodo) return false;
+      lista_insertar_primero(hash->tabla[hash_func(clave, hash->capacidad)], nodo);
+    }
+    return true;
 }
-
-
-
-/* Borra un elemento del hash y devuelve el dato asociado.  Devuelve
- * NULL si el dato no estaba.
- * Pre: La estructura hash fue inicializada
- * Post: El elemento fue borrado de la estructura y se lo devolvió,
- * en el caso de que estuviera guardado.
- */
 void *hash_borrar(hash_t *hash, const char *clave){
+
 }
-
-
-
-
-/* Obtiene el valor de un elemento del hash, si la clave no se encuentra
- * devuelve NULL.
- * Pre: La estructura hash fue inicializada
- */
 void* hash_obtener(const hash_t *hash, const char *clave){
+  lista_iter_t* iterEnNodoEncontrado = hash_buscar_clave(hash, clave);
+  if(iterEnNodoEncontrado){
+    hash_nodo_t* nodo = lista_iter_ver_actual(iterEnNodoEncontrado);
+    lista_iter_destruir(iterEnNodoEncontrado);
+    return nodo->dato;
+  }
+  return NULL;
 }
-
-
-
-/* Determina si clave pertenece o no al hash.
- * Pre: La estructura hash fue inicializada
- */
 bool hash_pertenece(const hash_t *hash, const char *clave){
-
+  lista_iter_t* iterEnNodoEncontrado = hash_buscar_clave(hash, clave);
+  if(iterEnNodoEncontrado){
+    lista_iter_destruir(iterEnNodoEncontrado);
+    return true;
+  }
+  return false;
 }
-
-
-
-/* Devuelve la cantidad de elementos del hash.
- * Pre: La estructura hash fue inicializada
- */
 size_t hash_cantidad(const hash_t *hash){
     return hash->elementos;
-
 }
-
-
-
-/* Destruye la estructura liberando la memoria pedida y llamando a la función
- * destruir para cada par (clave, dato).
- * Pre: La estructura hash fue inicializada
- * Post: La estructura hash fue destruida
- */
 void hash_destruir(hash_t *hash){
-
+  
 }
