@@ -3,11 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#define CAPAC 1000  // deberia ser numero primo para que el hash distribuya mejor segun martin.
-#define CAPACIDAD 53  // Me parece mejor que empiece de menor tamaño e ir redimensionando si se necesita mas,
-                      // sino tenia que guardar 3000 datos antes de redimensionar
 
-                      //Las documentaciones de las funciones ya estan en el .h
+#define CAPACIDAD 53  
 
 //ESTRUCTURAS DE DATOS
 
@@ -17,7 +14,7 @@ typedef struct nodo{
 }hash_nodo_t;
 
 struct hash{
-    void* tabla;
+    void** tabla;
     hash_destruir_dato_t* funcion_destruir;
     size_t elementos;
     size_t capacidad;
@@ -100,7 +97,7 @@ hash_t* hash_crear(hash_destruir_dato_t destruir_dato){
         }
         free(hash->tabla);
         free(hash);
-        return NULL;    //que te parece esta parte? me parece que me complique de mas
+        return NULL;
       }
     }
 
