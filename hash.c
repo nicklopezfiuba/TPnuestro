@@ -78,6 +78,40 @@ lista_iter_t* hash_buscar_clave(hash_t* hash, char* clave){
   return lista_buscar_clave(hash->tabla[pos], clave);
 }
 
+// Se Redimensiona el Hash, dependiendo de la nueva capacidad pasada por parametro.
+// Pre : El Hash pasado por parametro existe y la nueva capacidad es valida.
+// Post: El Hash se redimensiono y cuenta con todos los elementos del Hash pasado.
+void hash_redimensionar(hash_t* hash, size_t nueva_capacidad){
+    hash_t* nuevo_hash = malloc(sizeof(hash_t));
+    if(!nuevo_hash) return;
+    nuevo_hash->tabla = malloc(sizeof(hash_interno_t) * nueva_capacidad);
+    if(!nuevo_hash->tabla){
+        free(nuevo_hash);
+        return;
+    }
+    nuevo_hash->capacidad = nueva_capacidad;
+    nuevo_hash->elementos = 0;
+    //inicializar listas 
+    
+    int i = 0;
+    while(i < hash->capacidad){
+        if(!lista_esta_vacia(hash->tabla[i])){
+            lista_iter_t* iterador = lista_iter_crear(hash->tabla[i]);
+            while(!lista_iter_al_final(iterador)){
+                hash_nodo_t* nodo = lista_iter_ver_actual(iterador);
+                hash_guardar(nuevo_hash, nodo->clave, nodo->dato);
+                lista_iter_avanzar(iterador);
+            }
+            lista_iter_destruir(iterador);
+        }
+        i++;
+    }
+    
+    hash_destruir(hash);
+    hash = nuevo_hash;
+}
+
+
 //PRIMITIVAS HASH
 
 hash_t* hash_crear(hash_destruir_dato_t destruir_dato){
@@ -116,8 +150,13 @@ bool hash_guardar(hash_t *hash, const char *clave, void *dato){ //FALTA REDIMENS
       if(!nodo) return false;
       lista_insertar_primero(hash->tabla[hash_func(clave, hash->capacidad)], nodo);
     }
+    if(hash->elementos/hash->capacidad == 3){
+	size_t nueva_capacidad = hash->capacidad * 2; // Aumentamos un 100% la capacidad del Hash
+	hash_redimensionar(hash, nueva_capacidad);
+    }
     return true;
 }
+
 void *hash_borrar(hash_t *hash, const char *clave){
 	lista_iter_t* iterEnNodoEncontrado = hash_buscar_clave(hash, clave);
   if(iterEnNodoEncontrado){
